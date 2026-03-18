@@ -48,18 +48,27 @@ jobs:
         run: |
           mkdir -p release_bin
           
-          # 1. Find the bundled app. 
-          # Electrobun usually puts things in 'out/canary/' or 'packages/'
-          # We'll search for .app (Mac), .exe (Windows), or the binary (Linux)
-          SEARCH_PATH="out" # Change to "packages" if Electrobun uses that
-          
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # For Mac, we usually want to zip the .app bundle
-            cd $SEARCH_PATH && zip -r ../release_bin/${{ env.APP_NAME }}-macos-arm64.zip *.app && cd ..
+          echo "--- Searching for Build Output ---"
+          # This finds files that look like apps/executables, excluding common junk folders
+          # It looks for .exe (Windows), .app (Mac), or Linux binaries
+          POTENTIAL_BIN=$(find . -maxdepth 4 -not -path '*/.*' -not -path './node_modules/*' -not -path './src/*' -type f \( -name "*.exe" -o -name "*.app" -o -executable \) | head -n 1)
+
+          if [ -z "$POTENTIAL_BIN" ]; then
+            echo "❌ Error: Could not find any build artifacts!"
+            echo "Full Directory Tree for Debugging:"
+            ls -R
+            exit 1
+          fi
+
+          echo "✅ Found artifact at: $POTENTIAL_BIN"
+
+          if [[ "$POTENTIAL_BIN" == *.app* ]] && [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # Handle macOS .app folders by zipping them
+            APP_FOLDER=$(echo "$POTENTIAL_BIN" | grep -o '.*\.app')
+            zip -r "release_bin/${{ env.APP_NAME }}-macos.zip" "$APP_FOLDER"
           else
-            # For Windows/Linux, find the executable
-            SOURCE_FILE=$(find $SEARCH_PATH -type f \( -name "*.exe" -o -executable \) | grep -v "node_modules" | head -n 1)
-            cp "$SOURCE_FILE" release_bin/${{ env.APP_NAME }}-${{ matrix.platform }}${{ matrix.binary_ext }}
+            # Handle Windows/Linux single files
+            cp "$POTENTIAL_BIN" "release_bin/${{ env.APP_NAME }}-${{ matrix.platform }}${{ matrix.binary_ext }}"
           fi
 
       - name: Upload Artifacts
