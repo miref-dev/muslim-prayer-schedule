@@ -47,8 +47,20 @@ jobs:
         shell: bash
         run: |
           mkdir -p release_bin
-          # Adjust 'dist/my-app' to whatever your actual build output filename is
-          cp dist/my-app${{ matrix.binary_ext }} release_bin/${{ env.APP_NAME }}-${{ matrix.platform }}${{ matrix.binary_ext }}
+          
+          # 1. Find the bundled app. 
+          # Electrobun usually puts things in 'out/canary/' or 'packages/'
+          # We'll search for .app (Mac), .exe (Windows), or the binary (Linux)
+          SEARCH_PATH="out" # Change to "packages" if Electrobun uses that
+          
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # For Mac, we usually want to zip the .app bundle
+            cd $SEARCH_PATH && zip -r ../release_bin/${{ env.APP_NAME }}-macos-arm64.zip *.app && cd ..
+          else
+            # For Windows/Linux, find the executable
+            SOURCE_FILE=$(find $SEARCH_PATH -type f \( -name "*.exe" -o -executable \) | grep -v "node_modules" | head -n 1)
+            cp "$SOURCE_FILE" release_bin/${{ env.APP_NAME }}-${{ matrix.platform }}${{ matrix.binary_ext }}
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
