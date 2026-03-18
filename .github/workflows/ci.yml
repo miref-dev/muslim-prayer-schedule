@@ -1,29 +1,84 @@
-name: CI
+name: CI & Release
+
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    tags: ['v*']
   pull_request:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  APP_NAME: muslim-prayer-schedule
 
 jobs:
   build:
-    name: Build Application (${{ matrix.os }})
+    name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+            binary_ext: ""
+          - os: macos-latest
+            platform: macos-arm64
+            binary_ext: ""
+          - os: windows-latest
+            platform: windows-x64
+            binary_ext: ".exe"
     
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install Dependencies
         run: bun install
 
-      - name: Build Application Executables
+      - name: Build Application
         run: bun run build:canary
+
+      # This step renames your output so it's clear which OS it belongs to
+      - name: Prepare Binary for Upload
+        shell: bash
+        run: |
+          mkdir -p release_bin
+          # Adjust 'dist/my-app' to whatever your actual build output filename is
+          cp dist/my-app${{ matrix.binary_ext }} release_bin/${{ env.APP_NAME }}-${{ matrix.platform }}${{ matrix.binary_ext }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.platform }}
+          path: release_bin/*
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-binaries
+          pattern: bin-*
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: all-binaries/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
