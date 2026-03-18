@@ -49,25 +49,33 @@ jobs:
           mkdir -p release_bin
           
           echo "--- Searching for Build Output ---"
-          # This finds files that look like apps/executables, excluding common junk folders
-          # It looks for .exe (Windows), .app (Mac), or Linux binaries
-          POTENTIAL_BIN=$(find . -maxdepth 4 -not -path '*/.*' -not -path './node_modules/*' -not -path './src/*' -type f \( -name "*.exe" -o -name "*.app" -o -executable \) | head -n 1)
+          
+          # Detect the best candidate based on OS
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            # Windows: Look for .exe files, ignoring node_modules
+            POTENTIAL_BIN=$(find . -maxdepth 5 -name "*.exe" -not -path "*/node_modules/*" | head -n 1)
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # macOS: Look for .app folders
+            POTENTIAL_BIN=$(find . -maxdepth 5 -name "*.app" -not -path "*/node_modules/*" -type d | head -n 1)
+          else
+            # Linux: Look for files in 'out' or 'dist' that aren't web files (js/html/css)
+            POTENTIAL_BIN=$(find . -maxdepth 5 -type f -not -path "*/node_modules/*" -not -name "*.js" -not -name "*.html" -not -name "*.css" -not -name "*.json" | grep -v "\.git" | head -n 1)
+          fi
 
           if [ -z "$POTENTIAL_BIN" ]; then
             echo "❌ Error: Could not find any build artifacts!"
-            echo "Full Directory Tree for Debugging:"
-            ls -R
+            echo "Printing directory tree to help find it:"
+            ls -R | grep ":$" | sed -e 's/:$//' -e 's/[^-][^\/]*\//--/g' -e 's/^/   /'
             exit 1
           fi
 
           echo "✅ Found artifact at: $POTENTIAL_BIN"
 
-          if [[ "$POTENTIAL_BIN" == *.app* ]] && [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # Handle macOS .app folders by zipping them
-            APP_FOLDER=$(echo "$POTENTIAL_BIN" | grep -o '.*\.app')
-            zip -r "release_bin/${{ env.APP_NAME }}-macos.zip" "$APP_FOLDER"
+          if [[ "$POTENTIAL_BIN" == *.app ]]; then
+            # macOS .app is a folder; zip it
+            zip -r "release_bin/${{ env.APP_NAME }}-macos.zip" "$POTENTIAL_BIN"
           else
-            # Handle Windows/Linux single files
+            # Windows/Linux files
             cp "$POTENTIAL_BIN" "release_bin/${{ env.APP_NAME }}-${{ matrix.platform }}${{ matrix.binary_ext }}"
           fi
 
