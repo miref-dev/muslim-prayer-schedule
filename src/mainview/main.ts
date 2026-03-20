@@ -18,7 +18,7 @@ document.addEventListener("keydown", (e) => {
 document.body.style.overflow = 'hidden';
 
 
-
+const TODAY_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
 function getPrayerLocalTimes(): PrayerTimes | null {
 	const data = localStorage.getItem(PRAYER_TIMES_LOCAL_KEY);
 	if (data) {
@@ -30,8 +30,8 @@ function getPrayerLocalTimes(): PrayerTimes | null {
 function getTodaySchedule(): PrayerSchedule | null {
 	const schedule = getPrayerLocalTimes()?.jadwal;
 	if (!schedule?.length) return null;
-	const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-	return schedule.find(s => s.tanggal_lengkap === today) ?? schedule[0];
+
+	return schedule.find(s => s.tanggal_lengkap === TODAY_DATE) ?? schedule[0];
 }
 
 function buildPrayerTimes(schedule: PrayerSchedule | null) {
@@ -53,9 +53,8 @@ function buildPrayerTimes(schedule: PrayerSchedule | null) {
 
 // Returns the index of the currently active prayer (most recently passed)
 function getActivePrayerIndex(prayers: { name: string; time: string }[]): number {
-	const now = new Date();
+	const now = new Date(TODAY_DATE + "T" + new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Jakarta", hour12: false }));
 	const nowMins = now.getHours() * 60 + now.getMinutes();
-
 	let activeIdx = -1;
 	for (let i = 0; i < prayers.length; i++) {
 		const [h, m] = prayers[i].time.split(":").map(Number);
