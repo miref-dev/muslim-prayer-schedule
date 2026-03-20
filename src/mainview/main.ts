@@ -95,7 +95,7 @@ export default function render() {
 			<div class="w-full max-w-[500px] relative z-10 mx-auto">
 				<header class="text-center my-2 drag-region">
 					<h1 class="${theme.titleText} tracking-tight uppercase" style="-webkit-app-region: drag;">
-						Prayer Schedule
+						Jadwal Sholat
 					</h1>
 					<p class="uppercase tracking-widest ${theme.dateLoc} px-4 py-1.5 relative rounded-full inline-block">
 						${dateLabel}
